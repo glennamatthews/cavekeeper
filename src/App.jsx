@@ -903,6 +903,8 @@ export default function CaveKeeper() {
   const [labelPreview,  setLabelPreview]  = useState(null);   // base64 preview
   const [labelResult,   setLabelResult]   = useState(null);   // AI extracted data
   const [fetchingNotes, setFetchingNotes] = useState(false);  // fetching tasting notes
+  const fileRef  = useRef();
+  const labelRef = useRef();
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -964,24 +966,8 @@ export default function CaveKeeper() {
     });
   }, [session]);
 
-  // Show auth gate if not logged in
-  if (!session) return <AuthGate onAuth={setSession} />;
-
-  // Show loading screen while fetching from Supabase
-  if (dbLoading) return (
-    <div style={{ fontFamily:"'Palatino Linotype',serif", background:"#0a0604", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
-      <div style={{ fontSize:48 }}>🍷</div>
-      <div style={{ color:"#c9a84c", fontSize:18, fontWeight:700, letterSpacing:2 }}>Loading your cellar…</div>
-      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
-    </div>
-  );
-  const fileRef  = useRef();
-  const labelRef = useRef();
-
   const slotMap = useMemo(() => buildSlotMap(wines), [wines]);
 
-  // ── Notifications ──────────────────────────────────────────────────────────
-  // Build monthly digest alerts: ready next month, sticker changes, nearing peak
   const allAlerts = useMemo(() => {
     const alerts = [];
     const nextMonth = currentYear + (new Date().getMonth() === 11 ? 1 : 0);
@@ -1041,7 +1027,48 @@ export default function CaveKeeper() {
     });
 
     return alerts;
-  }, [wines]);
+  }
+
+  const filteredWines = useMemo(() => {
+    let w = [...wines];
+    if (search) { const q=search.toLowerCase(); w=w.filter(x=>x.winery.toLowerCase().includes(q)||x.varietal.toLowerCase().includes(q)||x.region.toLowerCase().includes(q)||String(x.vintage).includes(q)); }
+    if (filters.varietal.length) w=w.filter(x=>filters.varietal.includes(x.varietal));
+    if (filters.region.length)   w=w.filter(x=>filters.region.includes(x.region));
+    if (filters.sticker.length)  w=w.filter(x=>filters.sticker.includes(x.sticker));
+    if (filters.row.length)      w=w.filter(x=>filters.row.includes(x.row));
+    if (filters.occasion.length) w=w.filter(x=>x.occasion&&filters.occasion.some(o=>x.occasion.includes(o)));
+    if (filters.rtd)             w=w.filter(isRTD);
+    w.sort((a,b)=>{ let av=a[sort.key],bv=b[sort.key]; if(typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();} return sort.dir==="asc"?(av>bv?1:-1):(av<bv?1:-1); });
+    return w;
+  }
+
+  const varietalData = useMemo(()=>{
+    const m={}; wines.forEach(w=>{m[w.varietal]=(m[w.varietal]||0)+1;});
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({name,value}));
+  },[wines]);
+  const stickerData = useMemo(()=>Object.entries(STICKER).map(([k,v])=>({
+    name:v.label, value:wines.filter(w=>w.sticker===k).length, color:v.hex
+  })).filter(x=>x.value>0),[wines]);
+  const vintageBarData = useMemo(()=>{
+    const m={}; wines.forEach(w=>{m[w.vintage]=(m[w.vintage]||0)+1;});
+    return Object.entries(m).sort((a,b)=>a[0]-b[0]).map(([v,q])=>({vintage:String(v),qty:q}));
+  },[wines]);
+
+  // Show auth gate if not logged in
+  if (!session) return <AuthGate onAuth={setSession} />;
+
+  // Show loading screen while fetching from Supabase
+  if (dbLoading) return (
+    <div style={{ fontFamily:"'Palatino Linotype',serif", background:"#0a0604", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+      <div style={{ fontSize:48 }}>🍷</div>
+      <div style={{ color:"#c9a84c", fontSize:18, fontWeight:700, letterSpacing:2 }}>Loading your cellar…</div>
+      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
+    </div>
+  );
+
+  // ── Notifications ──────────────────────────────────────────────────────────
+  // Build monthly digest alerts: ready next month, sticker changes, nearing peak
+, [wines]);
 
   const activeAlerts = allAlerts.filter(a => !dismissedIds.includes(a.id));
   const criticalCount = activeAlerts.filter(a => a.severity === "critical").length;
@@ -1186,18 +1213,7 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
   const rtdCount     = wines.filter(isRTD).length;
 
   // ── Filtered list ──
-  const filteredWines = useMemo(() => {
-    let w = [...wines];
-    if (search) { const q=search.toLowerCase(); w=w.filter(x=>x.winery.toLowerCase().includes(q)||x.varietal.toLowerCase().includes(q)||x.region.toLowerCase().includes(q)||String(x.vintage).includes(q)); }
-    if (filters.varietal.length) w=w.filter(x=>filters.varietal.includes(x.varietal));
-    if (filters.region.length)   w=w.filter(x=>filters.region.includes(x.region));
-    if (filters.sticker.length)  w=w.filter(x=>filters.sticker.includes(x.sticker));
-    if (filters.row.length)      w=w.filter(x=>filters.row.includes(x.row));
-    if (filters.occasion.length) w=w.filter(x=>x.occasion&&filters.occasion.some(o=>x.occasion.includes(o)));
-    if (filters.rtd)             w=w.filter(isRTD);
-    w.sort((a,b)=>{ let av=a[sort.key],bv=b[sort.key]; if(typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();} return sort.dir==="asc"?(av>bv?1:-1):(av<bv?1:-1); });
-    return w;
-  }, [wines, search, filters, sort]);
+, [wines, search, filters, sort]);
 
   const toggleFilter = (key, val) => setFilters(f => ({ ...f, [key]: f[key].includes(val) ? f[key].filter(x=>x!==val) : [...f[key],val] }));
 
@@ -1288,16 +1304,13 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
   };
 
   // ── Charts data ──
-  const varietalData = useMemo(()=>{
     const m={}; wines.forEach(w=>{m[w.varietal]=(m[w.varietal]||0)+1;});
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({name,value}));
   },[wines]);
 
-  const stickerData = useMemo(()=>Object.entries(STICKER).map(([k,v])=>({
     name:v.label, value:wines.filter(w=>w.sticker===k).length, color:v.hex
   })).filter(x=>x.value>0),[wines]);
 
-  const vintageBarData = useMemo(()=>{
     const m={}; wines.forEach(w=>{m[w.vintage]=(m[w.vintage]||0)+1;});
     return Object.entries(m).sort((a,b)=>a[0]-b[0]).map(([v,q])=>({vintage:String(v),qty:q}));
   },[wines]);
