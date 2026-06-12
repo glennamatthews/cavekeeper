@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://wvydsbjpgdadftqbkygr.supabase.co";
-const SUPABASE_KEY = "sb_publishable_vPwYgdIGEeIIE44TEZxh9Q_gGhFIJq4";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2eWRzYmpwZ2RhZGZ0cWJreWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTYwMDIsImV4cCI6MjA5NjgzMjAwMn0.Z-VhIS4niHDpRT_SATW2u-n6botZXVCCjmIELQ30XJ8";
 const supabase     = createClient(SUPABASE_URL, SUPABASE_KEY);
 const NOTIFY_URL   = `${SUPABASE_URL}/functions/v1/notify-consume`;
 
