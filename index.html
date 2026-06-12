@@ -26,17 +26,13 @@
 <script src="https://unpkg.com/recharts@2.12.0/umd/Recharts.js"></script>
 <!-- Supabase via CDN -->
 <script src="https://unpkg.com/@supabase/supabase-js@2.49.0/dist/umd/supabase.js"></script>
-<script>
-// Load XLSX under a non-conflicting name before Babel runs
-window._XLSXLib = null;
-</script>
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" onload="window._XLSXLib = window.XLSX;"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <script type="text/babel" data-presets="react">
-const { useState, useMemo, useRef, useEffect } = React;
-const { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
-const { createClient } = supabase;
-const XLSXLib = window._XLSXLib || window.XLSX;
+const { useState, useMemo, useRef, useEffect } = window.React;
+const { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = window.Recharts;
+const { createClient } = window.supabase;
+const XLSXLib = window.XLSX;
 
 
 
