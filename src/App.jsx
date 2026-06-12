@@ -1027,7 +1027,7 @@ export default function CaveKeeper() {
     });
 
     return alerts;
-  }
+  },[wines]);
 
   const filteredWines = useMemo(() => {
     let w = [...wines];
