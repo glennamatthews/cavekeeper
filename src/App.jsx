@@ -30,10 +30,9 @@ const ROW_DEFS = [
   { id: "Magnum B", type: "magnum", label: "MB" },
 ];
 
-const ROW_CAPACITY = {};
-ROW_DEFS.forEach(r => {
-  ROW_CAPACITY[r.id] = SHELF_STRUCTURE[r.type].reduce((a, b) => a + b, 0);
-});
+const ROW_CAPACITY = Object.fromEntries(
+  ROW_DEFS.map(r => [r.id, SHELF_STRUCTURE[r.type].reduce((a, b) => a + b, 0)])
+);
 const TOTAL_CAPACITY = Object.values(ROW_CAPACITY).reduce((a, b) => a + b, 0); // 449
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
