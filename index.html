@@ -757,7 +757,11 @@ function CaveKeeper() {
     <div style={{ fontFamily:"'Palatino Linotype',serif", background:"#0a0604", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
       <div style={{ fontSize:48 }}>🍷</div>
       <div style={{ color:"#c9a84c", fontSize:18, fontWeight:700, letterSpacing:2 }}>Loading your cellar…</div>
-      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
+      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to database</div>
+      <button onClick={()=>{ setWines(SAMPLE_WINES); setDbReady(true); setDbLoading(false); }}
+        style={{ marginTop:16, background:"none", border:"1px solid #3a2810", color:"#7a6848", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+        Skip → Load local data
+      </button>
     </div>
   );
   const [view,        setView]        = useState("map");
@@ -801,18 +805,36 @@ function CaveKeeper() {
     if (!session) return;
     const loadWines = async () => {
       setDbLoading(true);
-      const { data, error } = await supabase.from("wines").select("*").order("row").order("shelf").order("slot");
-      if (error) {
-        console.error("Load error:", error);
-        setDbLoading(false);
-        return;
-      }
-      if (data && data.length > 0) {
-        setWines(data.map(dbToWine));
-        setDbReady(true);
-      } else {
-        // First run — seed the database from SAMPLE_WINES
-        await seedDatabase(SAMPLE_WINES);
+      try {
+        // 8 second timeout — if Supabase doesn't respond, fall back to local data
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        );
+        const fetchPromise = supabase.from("wines").select("*").order("row").order("shelf").order("slot");
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (error) {
+          console.error("Load error:", error);
+          // Fall back to local sample data so app still works
+          setWines(SAMPLE_WINES);
+          setDbReady(true);
+          setDbLoading(false);
+          return;
+        }
+        if (data && data.length > 0) {
+          setWines(data.map(dbToWine));
+          setDbReady(true);
+        } else {
+          // First run — seed the database from SAMPLE_WINES
+          // Seed in small batches and don't wait for all to complete
+          setWines(SAMPLE_WINES);
+          setDbReady(true);
+          // Seed in background
+          seedDatabase(SAMPLE_WINES).catch(e => console.error("Seed error:", e));
+        }
+      } catch (e) {
+        console.error("Load wines failed:", e);
+        // Always fall back to local data so app is usable
         setWines(SAMPLE_WINES);
         setDbReady(true);
       }
