@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
-
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://wvydsbjpgdadftqbkygr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2eWRzYmpwZ2RhZGZ0cWJreWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTYwMDIsImV4cCI6MjA5NjgzMjAwMn0.Z-VhIS4niHDpRT_SATW2u-n6botZXVCCjmIELQ30XJ8";
