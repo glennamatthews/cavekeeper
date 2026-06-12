@@ -881,6 +881,28 @@ export default function CaveKeeper() {
   const [dbReady,     setDbReady]     = useState(false);
   const [wines,       setWines]       = useState([]);
   const [dbLoading,   setDbLoading]   = useState(true);
+  const [view,        setView]        = useState("map");
+  const [selected,    setSelected]    = useState(null);   // wine object
+  const [slotPending, setSlotPending] = useState(null);   // {row,shelf,slot} for assign
+  const [search,      setSearch]      = useState("");
+  const [filters,     setFilters]     = useState({ varietal:[], region:[], sticker:[], row:[], occasion:[], rtd:false });
+  const [sort,        setSort]        = useState({ key:"winery", dir:"asc" });
+  const [addForm,     setAddForm]     = useState({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
+  const [addStep,     setAddStep]     = useState(1);
+  const [toast,       setToast]       = useState(null);
+  const [aiLoading,   setAiLoading]   = useState(false);
+  const [aiRec,       setAiRec]       = useState("");
+  const [aiOccasion,  setAiOccasion]  = useState("Celebration");
+  const [aiGuests,    setAiGuests]    = useState(4);
+  const [mapFilter,    setMapFilter]    = useState("all");
+  const [notifOpen,    setNotifOpen]    = useState(false);
+  const [dismissedIds, setDismissedIds] = useState([]);
+  const [editing,      setEditing]      = useState(false);  // wine detail edit mode
+  const [editForm,     setEditForm]     = useState(null);   // copy of wine being edited
+  const [labelScanning, setLabelScanning] = useState(false);  // scanning label photo
+  const [labelPreview,  setLabelPreview]  = useState(null);   // base64 preview
+  const [labelResult,   setLabelResult]   = useState(null);   // AI extracted data
+  const [fetchingNotes, setFetchingNotes] = useState(false);  // fetching tasting notes
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -953,28 +975,6 @@ export default function CaveKeeper() {
       <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
     </div>
   );
-  const [view,        setView]        = useState("map");
-  const [selected,    setSelected]    = useState(null);   // wine object
-  const [slotPending, setSlotPending] = useState(null);   // {row,shelf,slot} for assign
-  const [search,      setSearch]      = useState("");
-  const [filters,     setFilters]     = useState({ varietal:[], region:[], sticker:[], row:[], occasion:[], rtd:false });
-  const [sort,        setSort]        = useState({ key:"winery", dir:"asc" });
-  const [addForm,     setAddForm]     = useState({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
-  const [addStep,     setAddStep]     = useState(1);
-  const [toast,       setToast]       = useState(null);
-  const [aiLoading,   setAiLoading]   = useState(false);
-  const [aiRec,       setAiRec]       = useState("");
-  const [aiOccasion,  setAiOccasion]  = useState("Celebration");
-  const [aiGuests,    setAiGuests]    = useState(4);
-  const [mapFilter,    setMapFilter]    = useState("all");
-  const [notifOpen,    setNotifOpen]    = useState(false);
-  const [dismissedIds, setDismissedIds] = useState([]);
-  const [editing,      setEditing]      = useState(false);  // wine detail edit mode
-  const [editForm,     setEditForm]     = useState(null);   // copy of wine being edited
-  const [labelScanning, setLabelScanning] = useState(false);  // scanning label photo
-  const [labelPreview,  setLabelPreview]  = useState(null);   // base64 preview
-  const [labelResult,   setLabelResult]   = useState(null);   // AI extracted data
-  const [fetchingNotes, setFetchingNotes] = useState(false);  // fetching tasting notes
   const fileRef  = useRef();
   const labelRef = useRef();
 
