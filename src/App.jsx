@@ -1066,10 +1066,6 @@ export default function CaveKeeper() {
     </div>
   );
 
-  // ── Notifications ──────────────────────────────────────────────────────────
-  // Build monthly digest alerts: ready next month, sticker changes, nearing peak
-, [wines]);
-
   const activeAlerts = allAlerts.filter(a => !dismissedIds.includes(a.id));
   const criticalCount = activeAlerts.filter(a => a.severity === "critical").length;
   const warningCount  = activeAlerts.filter(a => a.severity === "warning").length;
@@ -1211,9 +1207,6 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
   const totalBottles = wines.length;
   const totalValue   = wines.reduce((s,w) => s + w.price, 0);
   const rtdCount     = wines.filter(isRTD).length;
-
-  // ── Filtered list ──
-, [wines, search, filters, sort]);
 
   const toggleFilter = (key, val) => setFilters(f => ({ ...f, [key]: f[key].includes(val) ? f[key].filter(x=>x!==val) : [...f[key],val] }));
 
