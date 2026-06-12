@@ -4,7 +4,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from "recharts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://wvydsbjpgdadftqbkygr.supabase.co";
@@ -565,9 +565,9 @@ const C = {
   muted:    "#7a6848",
   dim:      "#3a2810",
 };
-const inp = { background:"#0a0604", border:`1px solid ${C.border}`, color:C.text, padding:"9px 12px", borderRadius:6, fontSize:13, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
-const chip = (on, accent=C.gold) => ({ background: on ? `${accent}22` : C.card, border:`1px solid ${on ? accent : C.border}`, color: on ? accent : C.muted, padding:"5px 13px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all 0.15s" });
-const btn = (disabled=false, color="#8b1a1a") => ({ background: disabled ? C.dim : color, border:"none", color: disabled ? C.muted : "#fff", padding:"11px 22px", borderRadius:7, cursor: disabled ? "not-allowed" : "pointer", fontSize:14, fontFamily:"inherit", fontWeight:700, letterSpacing:.5, transition:"opacity 0.15s" });
+const inp  = { background:"#0a0604", border:"1px solid #2e1608", color:"#e8dcc8", padding:"9px 12px", borderRadius:6, fontSize:13, fontFamily:"inherit", width:"100%", boxSizing:"border-box", outline:"none" };
+const chip = (on, accent="#c9a84c") => ({ background: on ? `${accent}22` : "#1c0e04", border:`1px solid ${on ? accent : "#2e1608"}`, color: on ? accent : "#7a6848", padding:"5px 13px", borderRadius:20, cursor:"pointer", fontSize:12, fontFamily:"inherit", transition:"all 0.15s" });
+const btn  = (disabled=false, color="#8b1a1a") => ({ background: disabled ? "#3a2810" : color, border:"none", color: disabled ? "#7a6848" : "#fff", padding:"11px 22px", borderRadius:7, cursor: disabled ? "not-allowed" : "pointer", fontSize:14, fontFamily:"inherit", fontWeight:700, letterSpacing:.5, transition:"opacity 0.15s" });
 
 // ─── NAV ──────────────────────────────────────────────────────────────────────
 const NAV = [
