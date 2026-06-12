@@ -24,16 +24,19 @@
 <!-- Recharts via CDN -->
 <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
 <script src="https://unpkg.com/recharts@2.12.0/umd/Recharts.js"></script>
-<!-- XLSX via CDN -->
-<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <!-- Supabase via CDN -->
 <script src="https://unpkg.com/@supabase/supabase-js@2.49.0/dist/umd/supabase.js"></script>
+<script>
+// Load XLSX under a non-conflicting name before Babel runs
+window._XLSXLib = null;
+</script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" onload="window._XLSXLib = window.XLSX;"></script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useMemo, useRef, useEffect } = React;
 const { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
 const { createClient } = supabase;
-const XLSX = window.XLSX;
+const XLSXLib = window._XLSXLib || window.XLSX;
 
 
 
@@ -1074,8 +1077,8 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
     const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = async ev => {
-      const wb = XLSX.read(ev.target.result,{type:"binary"});
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      const wb = XLSXLib.read(ev.target.result,{type:"binary"});
+      const data = XLSXLib.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
       const imported = data.map((r,i) => ({
         id: Date.now()+i, winery:r.Winery||"", name:r.Name||r.Winery||"",
         varietal:r.Varietal||"Other", vintage:Number(r.Vintage||2020),
@@ -1096,10 +1099,10 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
   // ── Excel export ──
   const handleExport = () => {
     const data = wines.map(w=>({ Winery:w.winery, Varietal:w.varietal, Vintage:w.vintage, Region:w.region, Row:w.row, Shelf:w.shelf+1, Slot:w.slot+1, Sticker:w.sticker, Price:w.price, DrinkFrom:w.drinkFrom, DrinkTo:w.drinkTo, Rating:w.rating, Notes:w.notes }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"CaveKeeper");
-    XLSX.writeFile(wb,"cavekeeper-inventory.xlsx");
+    const ws = XLSXLib.utils.json_to_sheet(data);
+    const wb = XLSXLib.utils.book_new();
+    XLSXLib.utils.book_append_sheet(wb,ws,"CaveKeeper");
+    XLSXLib.writeFile(wb,"cavekeeper-inventory.xlsx");
     showToast("Exported to Excel");
   };
 
