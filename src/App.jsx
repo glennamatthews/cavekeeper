@@ -1296,18 +1296,6 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
     setAiLoading(false);
   };
 
-  // ── Charts data ──
-    const m={}; wines.forEach(w=>{m[w.varietal]=(m[w.varietal]||0)+1;});
-    return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([name,value])=>({name,value}));
-  },[wines]);
-
-    name:v.label, value:wines.filter(w=>w.sticker===k).length, color:v.hex
-  })).filter(x=>x.value>0),[wines]);
-
-    const m={}; wines.forEach(w=>{m[w.vintage]=(m[w.vintage]||0)+1;});
-    return Object.entries(m).sort((a,b)=>a[0]-b[0]).map(([v,q])=>({vintage:String(v),qty:q}));
-  },[wines]);
-
   const CHART_COLORS = ["#8b1a1a","#2471a3","#1e8449","#d4a017","#7d6608","#6c3483","#117a65","#784212"];
 
   // ═══════════════════════════════════════════════════════════════════════════
