@@ -12,6 +12,8 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
+    sourcemap: 'inline',
+    minify: false,
     commonjsOptions: { transformMixedEsModules: true },
     rollupOptions: {
       output: {
