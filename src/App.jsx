@@ -1932,6 +1932,8 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
           </div>
         )}
 
+      </main>
+
       {/* ════════════════════ WINE DETAIL MODAL ════════════════════ */}
       {selected && (
         <div onClick={()=>{setSelected(null);setEditing(false);}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
