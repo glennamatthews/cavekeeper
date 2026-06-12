@@ -8,15 +8,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@supabase/supabase-js', 'xlsx'],
-    esbuildOptions: {
-      target: 'es2020',
-    },
+    esbuildOptions: { target: 'es2020' },
   },
   build: {
     target: 'es2020',
-    commonjsOptions: {
-      transformMixedEsModules: true,
-    },
+    commonjsOptions: { transformMixedEsModules: true },
     rollupOptions: {
       output: {
         manualChunks(id) {
