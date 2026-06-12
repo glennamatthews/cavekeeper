@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
@@ -1732,16 +1731,20 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
               ))}
             </div>
             <div style={{fontSize:14,color:C.gold,fontWeight:700,marginBottom:14}}>My Cellar Vintages</div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={vintageBarData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.dim}/>
-                <XAxis dataKey="vintage" stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                <YAxis stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}/>
-                <Bar dataKey="qty" fill="#8b1a1a" radius={[4,4,0,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+            <div style={{display:"flex",alignItems:"flex-end",gap:2,height:160,paddingBottom:24,marginTop:8,overflowX:"auto"}}>
+              {vintageBarData.map(d=>{
+                const max=Math.max(...vintageBarData.map(x=>x.qty),1);
+                const h=Math.round(d.qty/max*120);
+                return (
+                  <div key={d.vintage} style={{flex:1,minWidth:22,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                    <div style={{fontSize:9,color:C.muted}}>{d.qty}</div>
+                    <div style={{width:"100%",height:h,background:"#8b1a1a",borderRadius:"3px 3px 0 0",minHeight:3}}/>
+                    <div style={{fontSize:8,color:C.muted,writingMode:"vertical-rl",transform:"rotate(180deg)",whiteSpace:"nowrap"}}>{d.vintage}</div>
+                  </div>
+                );
+              })}
+            </div>
+            </div>
         )}
 
         {/* ════════════════════ WINE LIST ════════════════════ */}
@@ -1803,61 +1806,96 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
           </div>
         )}
 
-        {/* ════════════════════ ANALYTICS ════════════════════ */}
+                {/* ════════════════════ ANALYTICS ════════════════════ */}
         {view==="charts" && (
           <div>
             <SectionTitle>Cellar Analytics</SectionTitle>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:20}}>
 
               <ChartCard title="Bottles by Varietal">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={varietalData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.dim}/>
-                    <XAxis type="number" stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                    <YAxis type="category" dataKey="name" stroke={C.muted} tick={{fill:C.muted,fontSize:10}} width={120}/>
-                    <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:12}}/>
-                    <Bar dataKey="value" radius={[0,4,4,0]}>{varietalData.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]}/>)}</Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div style={{display:"flex",flexDirection:"column",gap:6,paddingTop:4}}>
+                  {varietalData.map((d,i)=>{
+                    const max=Math.max(...varietalData.map(x=>x.value));
+                    const colors=["#8b1a1a","#2471a3","#1e8449","#d4a017","#7d6608","#6c3483","#117a65","#784212"];
+                    return (
+                      <div key={d.name} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:120,fontSize:11,color:C.muted,textAlign:"right",flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                        <div style={{flex:1,background:C.dim,borderRadius:3,height:18,overflow:"hidden"}}>
+                          <div style={{width:`${Math.round(d.value/max*100)}%`,height:"100%",background:colors[i%colors.length],borderRadius:3,display:"flex",alignItems:"center",paddingLeft:6}}>
+                            <span style={{fontSize:10,color:"#fff",fontWeight:700}}>{d.value}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </ChartCard>
 
               <ChartCard title="Cellar by Sticker Color">
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie data={stickerData} cx="50%" cy="50%" outerRadius={80} dataKey="value" fontSize={10}>
-                      {stickerData.map((e,i)=><Cell key={i} fill={e.color}/>)}
-                    </Pie>
-                    <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:12}} formatter={(v,n)=>[`${v} bottles`,n]}/>
-                    <Legend wrapperStyle={{color:C.muted,fontSize:12}}/>
-                  </PieChart>
-                </ResponsiveContainer>
+                <div style={{display:"flex",flexDirection:"column",gap:8,paddingTop:4}}>
+                  {stickerData.map(d=>{
+                    const max=Math.max(...stickerData.map(x=>x.value),1);
+                    return (
+                      <div key={d.name} style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{width:10,height:10,borderRadius:"50%",background:d.color,flexShrink:0}}/>
+                        <div style={{width:90,fontSize:12,color:C.muted,flexShrink:0}}>{d.name}</div>
+                        <div style={{flex:1,background:C.dim,borderRadius:3,height:16,overflow:"hidden"}}>
+                          <div style={{width:`${Math.round(d.value/max*100)}%`,height:"100%",background:d.color,borderRadius:3}}/>
+                        </div>
+                        <div style={{fontSize:12,color:C.text,fontWeight:700,width:28,textAlign:"right"}}>{d.value}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </ChartCard>
 
               <ChartCard title="Row Occupancy">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={ROW_DEFS.map(r=>({row:r.label,used:wines.filter(w=>w.row===r.id).length,cap:ROW_CAPACITY[r.id]}))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.dim}/>
-                    <XAxis dataKey="row" stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                    <YAxis stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                    <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:12}}/>
-                    <Legend wrapperStyle={{color:C.muted,fontSize:12}}/>
-                    <Bar dataKey="used" fill="#8b1a1a" radius={[4,4,0,0]} name="Bottles"/>
-                    <Bar dataKey="cap" fill={C.dim} radius={[4,4,0,0]} name="Capacity"/>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div style={{display:"flex",flexDirection:"column",gap:6,paddingTop:4}}>
+                  {ROW_DEFS.map(r=>{
+                    const used=wines.filter(w=>w.row===r.id).length;
+                    const cap=ROW_CAPACITY[r.id];
+                    const pct=cap>0?Math.round(used/cap*100):0;
+                    const color=pct>90?"#a93226":pct>70?"#d4a017":"#1e8449";
+                    return (
+                      <div key={r.id} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{width:65,fontSize:11,color:C.muted,flexShrink:0}}>{r.id}</div>
+                        <div style={{flex:1,background:C.dim,borderRadius:3,height:16,overflow:"hidden"}}>
+                          <div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:3}}/>
+                        </div>
+                        <div style={{fontSize:11,color:C.muted,width:45,textAlign:"right"}}>{used}/{cap}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ChartCard>
+
+              <ChartCard title="Vintages in Cellar">
+                <div style={{display:"flex",alignItems:"flex-end",gap:2,height:160,paddingTop:10,paddingBottom:24,overflowX:"auto"}}>
+                  {vintageBarData.map(d=>{
+                    const max=Math.max(...vintageBarData.map(x=>x.qty),1);
+                    const h=Math.round(d.qty/max*120);
+                    return (
+                      <div key={d.vintage} style={{flex:1,minWidth:22,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                        <div style={{fontSize:9,color:C.muted}}>{d.qty}</div>
+                        <div style={{width:"100%",height:h,background:"#2471a3",borderRadius:"3px 3px 0 0",minHeight:3}}/>
+                        <div style={{fontSize:8,color:C.muted,writingMode:"vertical-rl",transform:"rotate(180deg)",whiteSpace:"nowrap"}}>{d.vintage}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </ChartCard>
 
               <ChartCard title="Cellar Summary">
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   {[
-                    ["Total Bottles", totalBottles, C.text],
-                    ["Total Capacity", TOTAL_CAPACITY, C.text],
-                    ["Occupancy", `${Math.round(totalBottles/TOTAL_CAPACITY*100)}%`, totalBottles/TOTAL_CAPACITY>.9?"#a93226":"#1e8449"],
-                    ["Ready to Drink", rtdCount, "#1e8449"],
-                    ["Needs Aging", wines.filter(isNeedsAge).length, "#d4a017"],
-                    ["Past Peak", wines.filter(isPastPeak).length, "#a93226"],
-                    ["Total Value", `$${totalValue.toLocaleString()}`, C.gold],
-                    ["Avg / Bottle", `$${Math.round(totalValue/Math.max(totalBottles,1))}`, "#c4a882"],
+                    ["Total Bottles",totalBottles,C.text],
+                    ["Total Capacity",TOTAL_CAPACITY,C.text],
+                    ["Occupancy",`${Math.round(totalBottles/TOTAL_CAPACITY*100)}%`,totalBottles/TOTAL_CAPACITY>.9?"#a93226":"#1e8449"],
+                    ["Ready to Drink",rtdCount,"#1e8449"],
+                    ["Needs Aging",wines.filter(isNeedsAge).length,"#d4a017"],
+                    ["Past Peak",wines.filter(isPastPeak).length,"#a93226"],
+                    ["Total Value",`$${totalValue.toLocaleString()}`,C.gold],
+                    ["Avg / Bottle",`$${Math.round(totalValue/Math.max(totalBottles,1))}`, "#c4a882"],
                   ].map(([l,v,c])=>(
                     <div key={l} style={{background:C.bg,borderRadius:7,padding:12}}>
                       <div style={{fontSize:10,color:C.dim,textTransform:"uppercase",letterSpacing:1}}>{l}</div>
@@ -1870,9 +1908,9 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
               <ChartCard title="Drink Window Breakdown">
                 <div style={{padding:"8px 0"}}>
                   {[
-                    {label:"Ready Now", count:rtdCount, color:"#1e8449"},
-                    {label:"Needs More Time", count:wines.filter(isNeedsAge).length, color:"#d4a017"},
-                    {label:"Past Peak", count:wines.filter(isPastPeak).length, color:"#a93226"},
+                    {label:"Ready Now",count:rtdCount,color:"#1e8449"},
+                    {label:"Needs More Time",count:wines.filter(isNeedsAge).length,color:"#d4a017"},
+                    {label:"Past Peak",count:wines.filter(isPastPeak).length,color:"#a93226"},
                   ].map(({label,count,color})=>{
                     const pct=Math.round(count/Math.max(totalBottles,1)*100);
                     return (
@@ -1882,7 +1920,7 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
                           <span style={{color}}>{count} ({pct}%)</span>
                         </div>
                         <div style={{background:C.dim,borderRadius:3,height:8}}>
-                          <div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:3,transition:"width 0.5s"}}/>
+                          <div style={{width:`${pct}%`,height:"100%",background:color,borderRadius:3}}/>
                         </div>
                       </div>
                     );
@@ -1890,21 +1928,9 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
                 </div>
               </ChartCard>
 
-              <ChartCard title="Vintages in Cellar">
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={vintageBarData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={C.dim}/>
-                    <XAxis dataKey="vintage" stroke={C.muted} tick={{fill:C.muted,fontSize:10}}/>
-                    <YAxis stroke={C.muted} tick={{fill:C.muted,fontSize:11}}/>
-                    <Tooltip contentStyle={{background:C.card,border:`1px solid ${C.border}`,color:C.text,fontSize:12}}/>
-                    <Bar dataKey="qty" fill="#2471a3" radius={[4,4,0,0]} name="Bottles"/>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
             </div>
           </div>
         )}
-      </main>
 
       {/* ════════════════════ WINE DETAIL MODAL ════════════════════ */}
       {selected && (
