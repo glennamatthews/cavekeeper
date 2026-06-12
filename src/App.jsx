@@ -1040,7 +1040,7 @@ export default function CaveKeeper() {
     if (filters.rtd)             w=w.filter(isRTD);
     w.sort((a,b)=>{ let av=a[sort.key],bv=b[sort.key]; if(typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();} return sort.dir==="asc"?(av>bv?1:-1):(av<bv?1:-1); });
     return w;
-  }
+  },[wines, search, filters, sort]);
 
   const varietalData = useMemo(()=>{
     const m={}; wines.forEach(w=>{m[w.varietal]=(m[w.varietal]||0)+1;});
