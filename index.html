@@ -749,6 +749,42 @@ function CaveKeeper() {
   const [wines,       setWines]       = useState([]);
   const [dbLoading,   setDbLoading]   = useState(true);
 
+  // Show auth gate if not logged in
+  if (!session) return <AuthGate onAuth={setSession} />;
+
+  // Show loading screen while fetching from Supabase
+  if (dbLoading) return (
+    <div style={{ fontFamily:"'Palatino Linotype',serif", background:"#0a0604", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
+      <div style={{ fontSize:48 }}>🍷</div>
+      <div style={{ color:"#c9a84c", fontSize:18, fontWeight:700, letterSpacing:2 }}>Loading your cellar…</div>
+      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
+    </div>
+  );
+  const [view,        setView]        = useState("map");
+  const [selected,    setSelected]    = useState(null);   // wine object
+  const [slotPending, setSlotPending] = useState(null);   // {row,shelf,slot} for assign
+  const [search,      setSearch]      = useState("");
+  const [filters,     setFilters]     = useState({ varietal:[], region:[], sticker:[], row:[], occasion:[], rtd:false });
+  const [sort,        setSort]        = useState({ key:"winery", dir:"asc" });
+  const [addForm,     setAddForm]     = useState({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
+  const [addStep,     setAddStep]     = useState(1);
+  const [toast,       setToast]       = useState(null);
+  const [aiLoading,   setAiLoading]   = useState(false);
+  const [aiRec,       setAiRec]       = useState("");
+  const [aiOccasion,  setAiOccasion]  = useState("Celebration");
+  const [aiGuests,    setAiGuests]    = useState(4);
+  const [mapFilter,    setMapFilter]    = useState("all");
+  const [notifOpen,    setNotifOpen]    = useState(false);
+  const [dismissedIds, setDismissedIds] = useState([]);
+  const [editing,      setEditing]      = useState(false);  // wine detail edit mode
+  const [editForm,     setEditForm]     = useState(null);   // copy of wine being edited
+  const [labelScanning, setLabelScanning] = useState(false);  // scanning label photo
+  const [labelPreview,  setLabelPreview]  = useState(null);   // base64 preview
+  const [labelResult,   setLabelResult]   = useState(null);   // AI extracted data
+  const [fetchingNotes, setFetchingNotes] = useState(false);  // fetching tasting notes
+  const fileRef  = useRef();
+  const labelRef = useRef();
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -809,43 +845,7 @@ function CaveKeeper() {
     });
   }, [session]);
 
-  // Show auth gate if not logged in
-  if (!session) return <AuthGate onAuth={setSession} />;
-
-  // Show loading screen while fetching from Supabase
-  if (dbLoading) return (
-    <div style={{ fontFamily:"'Palatino Linotype',serif", background:"#0a0604", minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:16 }}>
-      <div style={{ fontSize:48 }}>🍷</div>
-      <div style={{ color:"#c9a84c", fontSize:18, fontWeight:700, letterSpacing:2 }}>Loading your cellar…</div>
-      <div style={{ color:"#7a6848", fontSize:13 }}>Connecting to Supabase</div>
-    </div>
-  );
-  const [view,        setView]        = useState("map");
-  const [selected,    setSelected]    = useState(null);   // wine object
-  const [slotPending, setSlotPending] = useState(null);   // {row,shelf,slot} for assign
-  const [search,      setSearch]      = useState("");
-  const [filters,     setFilters]     = useState({ varietal:[], region:[], sticker:[], row:[], occasion:[], rtd:false });
-  const [sort,        setSort]        = useState({ key:"winery", dir:"asc" });
-  const [addForm,     setAddForm]     = useState({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
-  const [addStep,     setAddStep]     = useState(1);
-  const [toast,       setToast]       = useState(null);
-  const [aiLoading,   setAiLoading]   = useState(false);
-  const [aiRec,       setAiRec]       = useState("");
-  const [aiOccasion,  setAiOccasion]  = useState("Celebration");
-  const [aiGuests,    setAiGuests]    = useState(4);
-  const [mapFilter,    setMapFilter]    = useState("all");
-  const [notifOpen,    setNotifOpen]    = useState(false);
-  const [dismissedIds, setDismissedIds] = useState([]);
-  const [editing,      setEditing]      = useState(false);  // wine detail edit mode
-  const [editForm,     setEditForm]     = useState(null);   // copy of wine being edited
-  const [labelScanning, setLabelScanning] = useState(false);  // scanning label photo
-  const [labelPreview,  setLabelPreview]  = useState(null);   // base64 preview
-  const [labelResult,   setLabelResult]   = useState(null);   // AI extracted data
-  const [fetchingNotes, setFetchingNotes] = useState(false);  // fetching tasting notes
-  const fileRef  = useRef();
-  const labelRef = useRef();
-
-  const slotMap = useMemo(() => buildSlotMap(wines), [wines]);
+      const slotMap = useMemo(() => buildSlotMap(wines), [wines]);
 
   // ── Notifications ──────────────────────────────────────────────────────────
   // Build monthly digest alerts: ready next month, sticker changes, nearing peak
