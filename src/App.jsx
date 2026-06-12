@@ -709,6 +709,175 @@ function wineToDb(w) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+function CellarMap({ wines, mapFilter, setMapFilter, slotMap, setSelected, setSlotPending, setView, setAddStep }) {
+    const mapWines = mapFilter === "all" ? wines : mapFilter === "rtd" ? wines.filter(isRTD) : mapFilter === "needs" ? wines.filter(isNeedsAge) : wines.filter(isPastPeak);
+    const mapSlots = buildSlotMap(mapWines);
+
+    // Reusable row column renderer
+    const renderRow = (rowDef, mapSlots) => {
+      const shelves = SHELF_STRUCTURE[rowDef.type];
+      const used = wines.filter(w=>w.row===rowDef.id).length;
+      const cap  = ROW_CAPACITY[rowDef.id];
+      const pct  = Math.round(used/cap*100);
+      return (
+        <div key={rowDef.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+          <div style={{fontSize:10,color:C.gold,fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:2}}>{rowDef.label}</div>
+          <div style={{fontSize:9,color:pct>90?"#c0392b":pct>70?"#d4a017":C.muted,marginBottom:4}}>{used}/{cap}</div>
+          {shelves.map((capacity,shelfIdx)=>{
+            const slots = Array.from({length:capacity},(_,slotIdx)=>{
+              const key = slotKey(rowDef.id,shelfIdx,slotIdx);
+              const wine = mapSlots[key]||slotMap[key];
+              return {key,wine,inFilter:!!mapSlots[key],slotIdx};
+            });
+            const shelfW = capacity*16+(capacity-1)*2+8;
+            return (
+              <div key={shelfIdx} style={{display:"flex",gap:2,alignItems:"center",background:"#1a0c04",border:`1px solid ${C.dim}`,borderRadius:4,padding:"3px 4px",width:shelfW,justifyContent:"center",boxSizing:"border-box"}}>
+                {slots.map(({key,wine,inFilter,slotIdx})=>{
+                  const isEmpty=!wine,dimmed=wine&&!inFilter;
+                  return (
+                    <div key={key}
+                      title={wine?`${wine.name||wine.varietal}\n${wine.winery} ${wine.vintage}\n${STICKER[wine.sticker]?.label}`:`Empty — ${rowDef.id}, Shelf ${shelfIdx+1}, Slot ${slotIdx+1}`}
+                      onClick={()=>{ if(wine){setSelected(wine);}else{setSlotPending({row:rowDef.id,shelf:shelfIdx,slot:slotIdx});setView("add");setAddStep(1);} }}
+                      style={{width:14,height:14,borderRadius:3,background:isEmpty?C.dim:STICKER[wine.sticker]?.hex,border:isEmpty?`1px dashed ${C.border}`:"none",cursor:"pointer",opacity:dimmed?0.25:1,transition:"transform 0.1s",flexShrink:0}}
+                      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.35)"}
+                      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+          <div style={{width:"100%",background:C.dim,borderRadius:2,height:3,marginTop:4,overflow:"hidden"}}>
+            <div style={{width:`${pct}%`,height:"100%",background:pct>90?"#c0392b":pct>70?"#d4a017":"#1e8449",borderRadius:2}}/>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
+          <div>
+            <h2 style={{fontSize:22,color:C.gold,fontWeight:700,margin:0,letterSpacing:1}}>Cellar Map</h2>
+            <p style={{color:C.muted,fontSize:13,margin:"4px 0 0"}}>Click any filled slot to inspect · Click any empty slot to assign a bottle</p>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {[["all","All Bottles"],["rtd","Ready to Drink"],["needs","Needs Aging"],["past","Past Peak"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setMapFilter(k)} style={chip(mapFilter===k)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:20}}>
+          {Object.entries(STICKER).map(([k,v])=>(
+            <div key={k} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
+              <div style={{width:12,height:12,borderRadius:2,background:v.hex,flexShrink:0}}/>
+              {v.label}
+            </div>
+          ))}
+          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
+            <div style={{width:12,height:12,borderRadius:2,background:C.dim,border:`1px dashed ${C.border}`,flexShrink:0}}/>
+            Empty
+          </div>
+        </div>
+
+        {/* The actual map — scrollable horizontally */}
+        <div style={{overflowX:"auto",paddingBottom:8}}>
+          <div style={{minWidth:"max-content"}}>
+
+            {/* Single flex row: R1 R2 R3 | [mid group: R4 R5 R6 + magnums inline] | R7 R8 R9 */}
+            <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+
+              {/* R1, R2, R3 */}
+              {ROW_DEFS.filter(r=>["Row 1","Row 2","Row 3"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
+
+              {/* Mid group: R4/5/6 stacked beside magnums */}
+              <div style={{display:"flex",flexDirection:"column",gap:0,alignItems:"center"}}>
+                {/* R4, R5, R6 in a horizontal row */}
+                <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
+                  {ROW_DEFS.filter(r=>["Row 4","Row 5","Row 6"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
+                </div>
+
+                {/* Magnums centered below R4/5/6 */}
+                <div style={{display:"flex",gap:6,alignItems:"flex-start",marginTop:8}}>
+                  {/* Label above both */}
+                  {ROW_DEFS.filter(r=>r.type==="magnum").map(rowDef=>{
+                    const shelves = SHELF_STRUCTURE.magnum;
+                    const used = wines.filter(w=>w.row===rowDef.id).length;
+                    const cap  = ROW_CAPACITY[rowDef.id];
+                    const pct  = Math.round(used/cap*100);
+                    return (
+                      <div key={rowDef.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                        <div style={{fontSize:10,color:C.gold,fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:2}}>{rowDef.label}</div>
+                        <div style={{fontSize:9,color:pct>90?"#c0392b":pct>70?"#d4a017":C.muted,marginBottom:4}}>{used}/{cap}</div>
+                        {shelves.map((_,shelfIdx)=>{
+                          const key  = slotKey(rowDef.id,shelfIdx,0);
+                          const wine = mapSlots[key]||slotMap[key];
+                          const inFilter = !!mapSlots[key];
+                          const isEmpty = !wine, dimmed = wine&&!inFilter;
+                          return (
+                            <div key={shelfIdx} style={{display:"flex",gap:2,background:"#1a0c04",border:`1px solid ${C.dim}`,borderRadius:4,padding:"3px 4px",boxSizing:"border-box"}}>
+                              <div
+                                title={wine?`${wine.name||wine.varietal}\n${wine.winery} ${wine.vintage}\nMagnum`:`Empty — ${rowDef.id}, Shelf ${shelfIdx+1}`}
+                                onClick={()=>{ if(wine){setSelected(wine);}else{setSlotPending({row:rowDef.id,shelf:shelfIdx,slot:0});setView("add");setAddStep(1);} }}
+                                style={{width:26,height:26,borderRadius:4,background:isEmpty?C.dim:STICKER[wine.sticker]?.hex,border:isEmpty?`1px dashed ${C.border}`:"none",cursor:"pointer",opacity:dimmed?0.25:1,transition:"transform 0.1s",flexShrink:0}}
+                                onMouseEnter={e=>e.currentTarget.style.transform="scale(1.3)"}
+                                onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
+                              />
+                            </div>
+                          );
+                        })}
+                        <div style={{width:"100%",background:C.dim,borderRadius:2,height:3,marginTop:4,overflow:"hidden"}}>
+                          <div style={{width:`${pct}%`,height:"100%",background:pct>90?"#c0392b":pct>70?"#d4a017":"#1e8449",borderRadius:2}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* R7, R8, R9 */}
+              {ROW_DEFS.filter(r=>["Row 7","Row 8","Row 9"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
+
+            </div>
+          </div>
+        </div>
+
+        {/* Summary row — clickable → search filtered by row */}
+        <div style={{marginTop:24}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Click any row to browse its bottles →</div>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            {ROW_DEFS.map(r=>{
+              const used=wines.filter(w=>w.row===r.id).length;
+              const cap=ROW_CAPACITY[r.id];
+              const pct=Math.round(used/cap*100);
+              const barColor = pct>90?"#a93226":pct>70?"#d4a017":"#1e8449";
+              return (
+                <div
+                  key={r.id}
+                  onClick={()=>{ setFilters(f=>({...f,row:[r.id]})); setView("search"); }}
+                  title={`Browse all bottles in ${r.id}`}
+                  style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:9,padding:"11px 16px",minWidth:86,textAlign:"center",cursor:"pointer",transition:"border-color 0.15s,transform 0.1s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.gold;e.currentTarget.style.transform="translateY(-2px)";}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform="none";}}
+                >
+                  <div style={{fontSize:12,color:C.gold,fontWeight:700,marginBottom:4}}>{r.id}</div>
+                  <div style={{fontSize:20,color:C.text,fontWeight:700}}>{used}</div>
+                  <div style={{fontSize:10,color:C.muted,margin:"3px 0 7px"}}>of {cap}</div>
+                  <div style={{background:C.dim,borderRadius:3,height:4,overflow:"hidden"}}>
+                    <div style={{width:`${pct}%`,height:"100%",background:barColor,borderRadius:3}}/>
+                  </div>
+                  <div style={{fontSize:10,color:barColor,marginTop:4}}>{pct}%</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 export default function CaveKeeper() {
   const [session,     setSession]     = useState(null);
   const [dbReady,     setDbReady]     = useState(false);
@@ -1140,174 +1309,7 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
   // ═══════════════════════════════════════════════════════════════════════════
   // CELLAR MAP COMPONENT (the centrepiece)
   // ═══════════════════════════════════════════════════════════════════════════
-  const CellarMap = () => {
-    const mapWines = mapFilter === "all" ? wines : mapFilter === "rtd" ? wines.filter(isRTD) : mapFilter === "needs" ? wines.filter(isNeedsAge) : wines.filter(isPastPeak);
-    const mapSlots = buildSlotMap(mapWines);
-
-    // Reusable row column renderer
-    const renderRow = (rowDef, mapSlots) => {
-      const shelves = SHELF_STRUCTURE[rowDef.type];
-      const used = wines.filter(w=>w.row===rowDef.id).length;
-      const cap  = ROW_CAPACITY[rowDef.id];
-      const pct  = Math.round(used/cap*100);
-      return (
-        <div key={rowDef.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-          <div style={{fontSize:10,color:C.gold,fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:2}}>{rowDef.label}</div>
-          <div style={{fontSize:9,color:pct>90?"#c0392b":pct>70?"#d4a017":C.muted,marginBottom:4}}>{used}/{cap}</div>
-          {shelves.map((capacity,shelfIdx)=>{
-            const slots = Array.from({length:capacity},(_,slotIdx)=>{
-              const key = slotKey(rowDef.id,shelfIdx,slotIdx);
-              const wine = mapSlots[key]||slotMap[key];
-              return {key,wine,inFilter:!!mapSlots[key],slotIdx};
-            });
-            const shelfW = capacity*16+(capacity-1)*2+8;
-            return (
-              <div key={shelfIdx} style={{display:"flex",gap:2,alignItems:"center",background:"#1a0c04",border:`1px solid ${C.dim}`,borderRadius:4,padding:"3px 4px",width:shelfW,justifyContent:"center",boxSizing:"border-box"}}>
-                {slots.map(({key,wine,inFilter,slotIdx})=>{
-                  const isEmpty=!wine,dimmed=wine&&!inFilter;
-                  return (
-                    <div key={key}
-                      title={wine?`${wine.name||wine.varietal}\n${wine.winery} ${wine.vintage}\n${STICKER[wine.sticker]?.label}`:`Empty — ${rowDef.id}, Shelf ${shelfIdx+1}, Slot ${slotIdx+1}`}
-                      onClick={()=>{ if(wine){setSelected(wine);}else{setSlotPending({row:rowDef.id,shelf:shelfIdx,slot:slotIdx});setView("add");setAddStep(1);} }}
-                      style={{width:14,height:14,borderRadius:3,background:isEmpty?C.dim:STICKER[wine.sticker]?.hex,border:isEmpty?`1px dashed ${C.border}`:"none",cursor:"pointer",opacity:dimmed?0.25:1,transition:"transform 0.1s",flexShrink:0}}
-                      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.35)"}
-                      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
-                    />
-                  );
-                })}
-              </div>
-            );
-          })}
-          <div style={{width:"100%",background:C.dim,borderRadius:2,height:3,marginTop:4,overflow:"hidden"}}>
-            <div style={{width:`${pct}%`,height:"100%",background:pct>90?"#c0392b":pct>70?"#d4a017":"#1e8449",borderRadius:2}}/>
-          </div>
-        </div>
-      );
-    };
-
-    return (
-      <div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
-          <div>
-            <h2 style={{fontSize:22,color:C.gold,fontWeight:700,margin:0,letterSpacing:1}}>Cellar Map</h2>
-            <p style={{color:C.muted,fontSize:13,margin:"4px 0 0"}}>Click any filled slot to inspect · Click any empty slot to assign a bottle</p>
-          </div>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[["all","All Bottles"],["rtd","Ready to Drink"],["needs","Needs Aging"],["past","Past Peak"]].map(([k,l])=>(
-              <button key={k} onClick={()=>setMapFilter(k)} style={chip(mapFilter===k)}>{l}</button>
-            ))}
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div style={{display:"flex",gap:16,flexWrap:"wrap",marginBottom:20}}>
-          {Object.entries(STICKER).map(([k,v])=>(
-            <div key={k} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
-              <div style={{width:12,height:12,borderRadius:2,background:v.hex,flexShrink:0}}/>
-              {v.label}
-            </div>
-          ))}
-          <div style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:C.muted}}>
-            <div style={{width:12,height:12,borderRadius:2,background:C.dim,border:`1px dashed ${C.border}`,flexShrink:0}}/>
-            Empty
-          </div>
-        </div>
-
-        {/* The actual map — scrollable horizontally */}
-        <div style={{overflowX:"auto",paddingBottom:8}}>
-          <div style={{minWidth:"max-content"}}>
-
-            {/* Single flex row: R1 R2 R3 | [mid group: R4 R5 R6 + magnums inline] | R7 R8 R9 */}
-            <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
-
-              {/* R1, R2, R3 */}
-              {ROW_DEFS.filter(r=>["Row 1","Row 2","Row 3"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
-
-              {/* Mid group: R4/5/6 stacked beside magnums */}
-              <div style={{display:"flex",flexDirection:"column",gap:0,alignItems:"center"}}>
-                {/* R4, R5, R6 in a horizontal row */}
-                <div style={{display:"flex",gap:6,alignItems:"flex-start"}}>
-                  {ROW_DEFS.filter(r=>["Row 4","Row 5","Row 6"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
-                </div>
-
-                {/* Magnums centered below R4/5/6 */}
-                <div style={{display:"flex",gap:6,alignItems:"flex-start",marginTop:8}}>
-                  {/* Label above both */}
-                  {ROW_DEFS.filter(r=>r.type==="magnum").map(rowDef=>{
-                    const shelves = SHELF_STRUCTURE.magnum;
-                    const used = wines.filter(w=>w.row===rowDef.id).length;
-                    const cap  = ROW_CAPACITY[rowDef.id];
-                    const pct  = Math.round(used/cap*100);
-                    return (
-                      <div key={rowDef.id} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                        <div style={{fontSize:10,color:C.gold,fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:2}}>{rowDef.label}</div>
-                        <div style={{fontSize:9,color:pct>90?"#c0392b":pct>70?"#d4a017":C.muted,marginBottom:4}}>{used}/{cap}</div>
-                        {shelves.map((_,shelfIdx)=>{
-                          const key  = slotKey(rowDef.id,shelfIdx,0);
-                          const wine = mapSlots[key]||slotMap[key];
-                          const inFilter = !!mapSlots[key];
-                          const isEmpty = !wine, dimmed = wine&&!inFilter;
-                          return (
-                            <div key={shelfIdx} style={{display:"flex",gap:2,background:"#1a0c04",border:`1px solid ${C.dim}`,borderRadius:4,padding:"3px 4px",boxSizing:"border-box"}}>
-                              <div
-                                title={wine?`${wine.name||wine.varietal}\n${wine.winery} ${wine.vintage}\nMagnum`:`Empty — ${rowDef.id}, Shelf ${shelfIdx+1}`}
-                                onClick={()=>{ if(wine){setSelected(wine);}else{setSlotPending({row:rowDef.id,shelf:shelfIdx,slot:0});setView("add");setAddStep(1);} }}
-                                style={{width:26,height:26,borderRadius:4,background:isEmpty?C.dim:STICKER[wine.sticker]?.hex,border:isEmpty?`1px dashed ${C.border}`:"none",cursor:"pointer",opacity:dimmed?0.25:1,transition:"transform 0.1s",flexShrink:0}}
-                                onMouseEnter={e=>e.currentTarget.style.transform="scale(1.3)"}
-                                onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
-                              />
-                            </div>
-                          );
-                        })}
-                        <div style={{width:"100%",background:C.dim,borderRadius:2,height:3,marginTop:4,overflow:"hidden"}}>
-                          <div style={{width:`${pct}%`,height:"100%",background:pct>90?"#c0392b":pct>70?"#d4a017":"#1e8449",borderRadius:2}}/>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* R7, R8, R9 */}
-              {ROW_DEFS.filter(r=>["Row 7","Row 8","Row 9"].includes(r.id)).map(rowDef => renderRow(rowDef, mapSlots))}
-
-            </div>
-          </div>
-        </div>
-
-        {/* Summary row — clickable → search filtered by row */}
-        <div style={{marginTop:24}}>
-          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Click any row to browse its bottles →</div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-            {ROW_DEFS.map(r=>{
-              const used=wines.filter(w=>w.row===r.id).length;
-              const cap=ROW_CAPACITY[r.id];
-              const pct=Math.round(used/cap*100);
-              const barColor = pct>90?"#a93226":pct>70?"#d4a017":"#1e8449";
-              return (
-                <div
-                  key={r.id}
-                  onClick={()=>{ setFilters(f=>({...f,row:[r.id]})); setView("search"); }}
-                  title={`Browse all bottles in ${r.id}`}
-                  style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:9,padding:"11px 16px",minWidth:86,textAlign:"center",cursor:"pointer",transition:"border-color 0.15s,transform 0.1s"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=C.gold;e.currentTarget.style.transform="translateY(-2px)";}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform="none";}}
-                >
-                  <div style={{fontSize:12,color:C.gold,fontWeight:700,marginBottom:4}}>{r.id}</div>
-                  <div style={{fontSize:20,color:C.text,fontWeight:700}}>{used}</div>
-                  <div style={{fontSize:10,color:C.muted,margin:"3px 0 7px"}}>of {cap}</div>
-                  <div style={{background:C.dim,borderRadius:3,height:4,overflow:"hidden"}}>
-                    <div style={{width:`${pct}%`,height:"100%",background:barColor,borderRadius:3}}/>
-                  </div>
-                  <div style={{fontSize:10,color:barColor,marginTop:4}}>{pct}%</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
+;
 
   // ═══════════════════════════════════════════════════════════════════════════
   return (
@@ -1469,7 +1471,7 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
       <main style={{padding:"20px",maxWidth:1440,margin:"0 auto"}}>
 
         {/* ════════════════════ CELLAR MAP ════════════════════ */}
-        {view==="map" && <CellarMap/>}
+        {view==="map" && <CellarMap wines={wines} mapFilter={mapFilter} setMapFilter={setMapFilter} slotMap={slotMap} setSelected={setSelected} setSlotPending={setSlotPending} setView={setView} setAddStep={setAddStep}/>}
 
         {/* ════════════════════ MY CELLAR ════════════════════ */}
         {view==="cellar" && (
