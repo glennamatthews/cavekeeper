@@ -708,7 +708,7 @@ function wineToDb(w) {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 function CellarMap({ wines, mapFilter, setMapFilter, slotMap, setSelected, setSlotPending, setView, setAddStep }) {
-    const mapWines = mapFilter === "all" ? wines : mapFilter === "rtd" ? wines.filter(isRTD) : mapFilter === "needs" ? wines.filter(isNeedsAge) : wines.filter(isPastPeak);
+    const mapWines = mapFilter === "all" ? wines : mapFilter === "rtd" ? wines.filter(w=>w.sticker==="green"||w.sticker==="yellow"||w.sticker==="blue") : mapFilter === "needs" ? wines.filter(w=>w.sticker==="red") : wines.filter(w=>w.sticker==="black");
     const mapSlots = buildSlotMap(mapWines);
 
     // Reusable row column renderer
@@ -760,7 +760,7 @@ function CellarMap({ wines, mapFilter, setMapFilter, slotMap, setSelected, setSl
             <p style={{color:C.muted,fontSize:13,margin:"4px 0 0"}}>Click any filled slot to inspect · Click any empty slot to assign a bottle</p>
           </div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[["all","All Bottles"],["rtd","Ready to Drink"],["needs","Needs Aging"],["past","Past Peak"]].map(([k,l])=>(
+            {[["all","All Bottles"],["rtd","🟢🟡🔵 Ready/Available"],["needs","🔴 Needs Aging"],["past","⚫ Past Peak"]].map(([k,l])=>(
               <button key={k} onClick={()=>setMapFilter(k)} style={chip(mapFilter===k)}>{l}</button>
             ))}
           </div>
@@ -1030,7 +1030,8 @@ export default function CaveKeeper() {
   },[wines]);
 
   const filteredWines = useMemo(() => {
-    let w = [...wines];
+    // Only show bottles that have a winery name (filter out empty slots)
+    let w = wines.filter(x => x.winery && x.winery.trim() !== "");
     if (search) { const q=search.toLowerCase(); w=w.filter(x=>x.winery.toLowerCase().includes(q)||x.varietal.toLowerCase().includes(q)||x.region.toLowerCase().includes(q)||String(x.vintage).includes(q)); }
     if (filters.varietal.length) w=w.filter(x=>filters.varietal.includes(x.varietal));
     if (filters.region.length)   w=w.filter(x=>filters.region.includes(x.region));
@@ -1173,26 +1174,21 @@ Return ONLY the JSON, no other text.` }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          max_tokens: 200,
           messages: [{
             role: "user",
-            content: `Search for professional tasting notes for: ${wine.winery} ${wine.vintage} ${wine.varietal} ${wine.name ? `"${wine.name}"` : ""} from ${wine.region}.
+            content: `You are a master sommelier. Write a 2-sentence tasting note for: ${wine.winery} ${wine.vintage} ${wine.name ? '"'+wine.name+'"' : ""} ${wine.varietal} from ${wine.region}.
 
-Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture, and finish. Nothing else — no winery history, no scores, no food pairing, no drink window, no preamble. Just the sensory description of the wine itself. Start directly with the tasting description.`
+Describe only the sensory experience: color, aroma, palate flavors, texture, and finish. Be specific and expert. Start directly with the tasting description — no preamble.`
           }]
         })
       });
       const data = await res.json();
-      const textBlock = data.content?.find(b => b.type === "text");
-      const raw = textBlock?.text || "";
-      // Strip any preamble lines, keep only the tasting note
-      const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-      const note = lines.slice(-2).join(" ") || lines.join(" ") || "No tasting notes found.";
+      const note = data.content?.[0]?.text || "No tasting notes found.";
       await supabase.from("wines").update({ notes: note }).eq("id", wine.id);
       setSelected(prev => prev ? { ...prev, notes: note } : prev);
       showToast("Tasting notes updated!");
-    } catch {
+    } catch(e) {
       showToast("Could not fetch tasting notes.", "error");
     }
     setFetchingNotes(false);
@@ -1279,16 +1275,15 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
     setSlotPending(null); setAddForm({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
   };
 
-  // ── AI rec ──
   const getAiRec = async () => {
     setAiLoading(true); setAiRec("");
-    const rtd = wines.filter(isRTD).slice(0,30).map(w=>
+    const rtd = wines.filter(w=>w.sticker==="green"||w.sticker==="yellow"||w.sticker==="blue").slice(0,30).map(w=>
       `${w.name||w.varietal} · ${w.winery} ${w.vintage} · ${w.varietal} · ${w.region} · $${w.price} · LOCATION: ${w.row}, Shelf ${w.shelf+1}, Slot ${w.slot+1}`
     ).join("\n");
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, messages:[{role:"user",content:`You are a master sommelier. Occasion: ${aiOccasion} for ${aiGuests} guests.\n\nMy ready-to-drink wines (with cellar location):\n${rtd}\n\nRecommend 2-3 specific bottles. For each bottle you MUST include:\n1. Wine name and vintage\n2. 📍 Cellar location (row, shelf, slot — exactly as listed above)\n3. Why it fits this occasion\n4. Ideal serving temperature\n5. Food pairing suggestion\n\nBe concise and expert. Format each recommendation clearly with the wine name as a heading.`}] })
+        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, messages:[{role:"user",content:`You are a master sommelier. Occasion: ${aiOccasion} for ${aiGuests} guests.\n\nMy available wines (with cellar location):\n${rtd}\n\nRecommend 2-3 specific bottles. For each:\n1. Wine name and vintage\n2. 📍 Cellar location (exactly as listed)\n3. Why it fits this occasion\n4. Serving temperature\n\nBe concise and expert.`}] })
       });
       const d = await res.json();
       setAiRec(d.content?.[0]?.text || "No recommendation.");
@@ -1580,10 +1575,42 @@ Return ONLY a 2-sentence tasting note describing: aroma, palate flavors, texture
                   {!slotPending&&(
                     <FF label="Row">
                       <select value={addForm.row} onChange={e=>setAddForm(f=>({...f,row:e.target.value}))} style={inp}>
-                        {ROW_DEFS.map(r=>{const free=ROW_CAPACITY[r.id]-wines.filter(w=>w.row===r.id).length; return <option key={r.id} value={r.id}>{r.id} ({free} slots free)</option>;})}
+                        {ROW_DEFS.map(r=>{
+                          const def = ROW_DEFS.find(x=>x.id===r.id);
+                          const shelves = SHELF_STRUCTURE[def.type];
+                          const totalSlots = shelves.reduce((a,b)=>a+b,0);
+                          const usedSlots = wines.filter(w=>w.row===r.id).length;
+                          const free = totalSlots - usedSlots;
+                          return <option key={r.id} value={r.id}>{r.id} ({free} slots free)</option>;
+                        })}
                       </select>
                     </FF>
                   )}
+                  {!slotPending && addForm.row && (()=>{
+                    const def = ROW_DEFS.find(r=>r.id===addForm.row);
+                    const shelves = SHELF_STRUCTURE[def?.type||"full"];
+                    return (
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                        <FF label="Shelf (1-based)">
+                          <select value={addForm.shelf} onChange={e=>setAddForm(f=>({...f,shelf:Number(e.target.value),slot:0}))} style={inp}>
+                            {shelves.map((cap,si)=>{
+                              const takenSlots = Array.from({length:cap},(_,sl)=>slotMap[slotKey(addForm.row,si,sl)]).filter(Boolean).length;
+                              const freeSlots = cap - takenSlots;
+                              return <option key={si} value={si}>Shelf {si+1} ({freeSlots} free)</option>;
+                            })}
+                          </select>
+                        </FF>
+                        <FF label="Slot (Position)">
+                          <select value={addForm.slot} onChange={e=>setAddForm(f=>({...f,slot:Number(e.target.value)}))} style={inp}>
+                            {Array.from({length:shelves[addForm.shelf]||3},(_,sl)=>{
+                              const taken = !!slotMap[slotKey(addForm.row,addForm.shelf,sl)];
+                              return <option key={sl} value={sl} disabled={taken}>{sl+1} {taken?"(occupied)":"(free)"}</option>;
+                            })}
+                          </select>
+                        </FF>
+                      </div>
+                    );
+                  })()}
                   <FF label="Occasions">
                     <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                       {OCCASIONS.map(o=><button key={o} onClick={()=>setAddForm(f=>({...f,occasion:f.occasion.includes(o)?f.occasion.filter(x=>x!==o):[...f.occasion,o]}))} style={{...chip(addForm.occasion.includes(o)),fontSize:12}}>{o}</button>)}
