@@ -4,8 +4,16 @@ import { createClient } from "@supabase/supabase-js";
 // ─── SUPABASE ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://wvydsbjpgdadftqbkygr.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2eWRzYmpwZ2RhZGZ0cWJreWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNTYwMDIsImV4cCI6MjA5NjgzMjAwMn0.Z-VhIS4niHDpRT_SATW2u-n6botZXVCCjmIELQ30XJ8";
-const supabase     = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase     = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: window.localStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  }
+});
 const NOTIFY_URL   = `${SUPABASE_URL}/functions/v1/notify-consume`;
+const CLAUDE_URL   = `${SUPABASE_URL}/functions/v1/claude-proxy`;
 
 // ─── CELLAR PHYSICAL STRUCTURE ───────────────────────────────────────────────
 // Each row is a vertical rail from floor to ceiling.
@@ -1083,7 +1091,7 @@ export default function CaveKeeper() {
   };
 
   const updateSticker = async (wine, correct) => {
-    await supabase.from("wines").update({ sticker: correct }).eq("id", wine.id);
+    await supabase.from("wines").update({ sticker: correct }).eq("id", String(wine.id));
     dismissAlert(`sticker-${wine.id}`);
     showToast(`Sticker updated to ${STICKER[correct]?.label} for ${wine.winery} ${wine.vintage}`);
   };
@@ -1102,7 +1110,7 @@ export default function CaveKeeper() {
       setLabelScanning(true);
       setLabelResult(null);
       try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const res = await fetch(CLAUDE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1169,7 +1177,7 @@ Return ONLY the JSON, no other text.` }
   const fetchTastingNotes = async (wine) => {
     setFetchingNotes(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(CLAUDE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1185,7 +1193,7 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
       });
       const data = await res.json();
       const note = data.content?.[0]?.text || "No tasting notes found.";
-      await supabase.from("wines").update({ notes: note }).eq("id", wine.id);
+      await supabase.from("wines").update({ notes: note }).eq("id", String(wine.id));
       setSelected(prev => prev ? { ...prev, notes: note } : prev);
       showToast("Tasting notes updated!");
     } catch(e) {
@@ -1200,7 +1208,7 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
   };
 
   // ── Stats ──
-  const totalBottles = wines.length;
+  const totalBottles = wines.filter(w=>w.winery && w.winery.trim()!=="").length;
   const totalValue   = wines.reduce((s,w) => s + w.price, 0);
   const rtdCount     = wines.filter(isRTD).length;
 
@@ -1254,11 +1262,16 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
 
   const submitAdd = async () => {
     const sticker = autoSticker(Number(addForm.price), Number(addForm.drinkFrom), Number(addForm.drinkTo));
-    const free = nextFreeSlot(addForm.row);
-    if (!free) { showToast(`${addForm.row} is full!`, "error"); return; }
-    const w = { ...addForm, id:Date.now(), shelf:free.shelf, slot:free.slot, sticker, price:Number(addForm.price), rating:Number(addForm.rating), vintage:Number(addForm.vintage), drinkFrom:Number(addForm.drinkFrom), drinkTo:Number(addForm.drinkTo), quantity:1 };
+    // Use user-selected shelf/slot, fall back to next free if not set
+    const shelf = Number(addForm.shelf) || 0;
+    const slot  = Number(addForm.slot)  || 0;
+    // Check if selected slot is already taken
+    if (slotMap[slotKey(addForm.row, shelf, slot)]) {
+      showToast("That slot is already occupied — pick another", "error"); return;
+    }
+    const w = { ...addForm, id:Date.now(), shelf, slot, sticker, price:Number(addForm.price), rating:Number(addForm.rating), vintage:Number(addForm.vintage), drinkFrom:Number(addForm.drinkFrom), drinkTo:Number(addForm.drinkTo), quantity:1 };
     const { error } = await supabase.from("wines").insert(wineToDb(w));
-    if (error) { showToast("Failed to save — check connection", "error"); return; }
+    if (error) { showToast(`Error: ${error.message}`, "error"); return; }
     showToast(`${w.name||w.winery} ${w.vintage} added to ${w.row}, shelf ${w.shelf+1}`);
     setAddForm({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
     setAddStep(1); setView("map");
@@ -1270,7 +1283,7 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
     const sticker = autoSticker(Number(addForm.price), Number(addForm.drinkFrom), Number(addForm.drinkTo));
     const w = { ...addForm, id:Date.now(), row:slotPending.row, shelf:slotPending.shelf, slot:slotPending.slot, sticker, price:Number(addForm.price), rating:Number(addForm.rating), vintage:Number(addForm.vintage), drinkFrom:Number(addForm.drinkFrom), drinkTo:Number(addForm.drinkTo), quantity:1 };
     const { error } = await supabase.from("wines").insert(wineToDb(w));
-    if (error) { showToast("Failed to save — check connection", "error"); return; }
+    if (error) { showToast(`Error: ${error.message}`, "error"); return; }
     showToast(`${w.name||w.winery} ${w.vintage} placed in ${w.row}, shelf ${w.shelf+1}`);
     setSlotPending(null); setAddForm({ winery:"", varietal:"Cabernet Sauvignon", vintage:2022, region:"Napa Valley", row:"Row 1", shelf:0, slot:0, price:"", drinkFrom:2024, drinkTo:2034, rating:"", notes:"", occasion:[] });
   };
@@ -1281,7 +1294,7 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
       `${w.name||w.varietal} · ${w.winery} ${w.vintage} · ${w.varietal} · ${w.region} · $${w.price} · LOCATION: ${w.row}, Shelf ${w.shelf+1}, Slot ${w.slot+1}`
     ).join("\n");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
+      const res = await fetch(CLAUDE_URL,{
         method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, messages:[{role:"user",content:`You are a master sommelier. Occasion: ${aiOccasion} for ${aiGuests} guests.\n\nMy available wines (with cellar location):\n${rtd}\n\nRecommend 2-3 specific bottles. For each:\n1. Wine name and vintage\n2. 📍 Cellar location (exactly as listed)\n3. Why it fits this occasion\n4. Serving temperature\n\nBe concise and expert.`}] })
       });
@@ -2035,7 +2048,8 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
 
               <div style={{display:"flex",gap:8}}>
                 <button onClick={async ()=>{
-                  await supabase.from("wines").delete().eq("id",selected.id);
+                  const { error: delErr } = await supabase.from("wines").delete().eq("id", String(selected.id));
+                  if (delErr) { showToast(`Error: ${delErr.message}`, "error"); return; }
                   setSelected(null); setEditing(false);
                   showToast("Bottle removed","error");
                 }} style={{flex:1,background:"#2d0a00",border:`1px solid #5a1a00`,color:"#a93226",padding:10,borderRadius:7,cursor:"pointer",fontSize:12,fontFamily:"inherit"}}>🗑 Remove</button>
@@ -2052,7 +2066,8 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
                     price:      selected.price,
                   });
                   // Delete from cellar
-                  await supabase.from("wines").delete().eq("id",selected.id);
+                  const { error: delErr } = await supabase.from("wines").delete().eq("id", String(selected.id));
+                  if (delErr) { showToast(`Error: ${delErr.message}`, "error"); return; }
                   // Send Pushover notification
                   try {
                     const { data: { session: s } } = await supabase.auth.getSession();
@@ -2135,7 +2150,7 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
                   <button onClick={()=>setEditing(false)} style={{flex:1,background:"none",border:`1px solid ${C.border}`,color:C.muted,padding:10,borderRadius:7,cursor:"pointer",fontSize:13,fontFamily:"inherit"}}>← Cancel</button>
                   <button
                     onClick={async ()=>{
-                      const { error } = await supabase.from("wines").update(wineToDb(editForm)).eq("id", editForm.id);
+                      const { error } = await supabase.from("wines").update(wineToDb(editForm)).eq("id", String(editForm.id));
                       if (error) { showToast("Failed to save changes", "error"); return; }
                       setSelected({...editForm});
                       setEditing(false);
