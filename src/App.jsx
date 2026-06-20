@@ -1114,7 +1114,7 @@ export default function CaveKeeper() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
+            model: "claude-opus-4-5",
             max_tokens: 1000,
             messages: [{
               role: "user",
@@ -1177,26 +1177,28 @@ Return ONLY the JSON, no other text.` }
   const fetchTastingNotes = async (wine) => {
     setFetchingNotes(true);
     try {
+      const { data: { session: _cs } } = await supabase.auth.getSession();
       const res = await fetch(CLAUDE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_cs?.access_token||""}` },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-opus-4-5",
           max_tokens: 200,
           messages: [{
             role: "user",
-            content: `You are a master sommelier. Write a 2-sentence tasting note for: ${wine.winery} ${wine.vintage} ${wine.name ? '"'+wine.name+'"' : ""} ${wine.varietal} from ${wine.region}.
-
-Describe only the sensory experience: color, aroma, palate flavors, texture, and finish. Be specific and expert. Start directly with the tasting description — no preamble.`
+            content: `You are a master sommelier. Write a 2-sentence tasting note for: ${wine.winery} ${wine.vintage} ${wine.name ? '"'+wine.name+'"' : ""} ${wine.varietal} from ${wine.region}. Describe only the sensory experience: color, aroma, palate flavors, texture, and finish. Be specific and expert. Start directly with the tasting description — no preamble.`
           }]
         })
       });
       const data = await res.json();
-      const note = data.content?.[0]?.text || "No tasting notes found.";
+      console.log("Tasting notes response:", JSON.stringify(data));
+      const note = data.content?.[0]?.text?.trim() || "";
+      if (!note) { showToast("No notes returned — check console", "error"); setFetchingNotes(false); return; }
       await supabase.from("wines").update({ notes: note }).eq("id", String(wine.id));
       setSelected(prev => prev ? { ...prev, notes: note } : prev);
       showToast("Tasting notes updated!");
     } catch(e) {
+      console.error("Fetch notes error:", e);
       showToast("Could not fetch tasting notes.", "error");
     }
     setFetchingNotes(false);
@@ -1294,9 +1296,10 @@ Describe only the sensory experience: color, aroma, palate flavors, texture, and
       `${w.name||w.varietal} · ${w.winery} ${w.vintage} · ${w.varietal} · ${w.region} · $${w.price} · LOCATION: ${w.row}, Shelf ${w.shelf+1}, Slot ${w.slot+1}`
     ).join("\n");
     try {
+      const { data: { session: _as } } = await supabase.auth.getSession();
       const res = await fetch(CLAUDE_URL,{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, messages:[{role:"user",content:`You are a master sommelier. Occasion: ${aiOccasion} for ${aiGuests} guests.\n\nMy available wines (with cellar location):\n${rtd}\n\nRecommend 2-3 specific bottles. For each:\n1. Wine name and vintage\n2. 📍 Cellar location (exactly as listed)\n3. Why it fits this occasion\n4. Serving temperature\n\nBe concise and expert.`}] })
+        method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${_as?.access_token||""}`},
+        body:JSON.stringify({ model:"claude-opus-4-5", max_tokens:600, messages:[{role:"user",content:`You are a master sommelier. Occasion: ${aiOccasion} for ${aiGuests} guests.\n\nMy available wines (with cellar location):\n${rtd}\n\nRecommend 2-3 specific bottles. For each:\n1. Wine name and vintage\n2. 📍 Cellar location (exactly as listed)\n3. Why it fits this occasion\n4. Serving temperature\n\nBe concise and expert.`}] })
       });
       const d = await res.json();
       setAiRec(d.content?.[0]?.text || "No recommendation.");
